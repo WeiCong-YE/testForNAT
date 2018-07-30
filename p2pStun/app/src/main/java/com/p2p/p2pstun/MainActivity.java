@@ -3,6 +3,7 @@ package com.p2p.p2pstun;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -20,7 +21,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        TextView tv = (TextView) findViewById(R.id.localIpAndPort);
+        initEnv();
     }
 
     /**
@@ -54,6 +55,13 @@ public class MainActivity extends AppCompatActivity {
         if (gettedIpAndPort != null){
             EditText gettedLocalIpAndPort = findViewById(R.id.gettedLocalIpAndPort);
             gettedLocalIpAndPort.setText(gettedIpAndPort);
+
+            String[] ipAndPort =  gettedIpAndPort.split(":");
+            EditText oppositeIp = findViewById(R.id.oppositeIp);
+            oppositeIp.setText(ipAndPort[0]);
+
+            EditText oppositePort = findViewById(R.id.oppositePort);
+            oppositePort.setText(ipAndPort[1]);
         } else {
             Toast.makeText(this,
                     "获取本地外网IP与端口对失败",
@@ -73,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (oppositeIp.length() > 0 &&
             oppositePort.length() > 0){
-            if (0 == setPeerIpAndPort(oppositeIp, oppositePort)){
+            if (0 == setOppositeNet(oppositeIp, oppositePort)){
                 EditText sendTV = findViewById(R.id.sendText);
                 String sendData = sendTV.getText().toString();
                 if (sendData.length() > 0){
@@ -93,9 +101,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void recvData(String data){
-        EditText recvTV = findViewById(R.id.recevText);
-        recvTV.setText(data);
+//        EditText recvTV = findViewById(R.id.recevText);
+//        recvTV.setText(data);
+        Log.d("MainActivity", "recvData: " + data);
     }
+
+    /**
+     * 初始化一些JVM环境
+     */
+    public native void initEnv();
 
     /**
      * 从指定服务器获取本地外网IP与端口对
@@ -112,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
      * @param peerPort 对端端口号
      * @return 0：设置成功； 其他值：设置失败
      */
-    public native int setPeerIpAndPort(String peerIp, String peerPort);
+    public native int setOppositeNet(String peerIp, String peerPort);
 
     /**
      * 发送数据到P2P的对端

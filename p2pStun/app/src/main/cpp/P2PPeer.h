@@ -7,7 +7,14 @@
 
 #include <sys/socket.h>
 #include <string>
-//#include <thread>
+#include <thread>
+#include <memory>
+
+enum class ThreadStatus:unsigned char{
+    NOT_SART = 1,
+    RUNNING = 2,
+    EXIT = 3
+};
 
 class P2PPeer{
 public:
@@ -45,14 +52,38 @@ public:
 private:
     int convertLocalNet(const struct sockaddr *addr, socklen_t addrlen);
 
-//    void run();
+    /**
+     * 循环接收UDP数据
+     * @return
+     */
+    int recvUdpDataLoop();
+
+    /**
+     * 处理接收到的UDP数据
+     * @return
+     */
+    int proccesRecvedData(const char* data, int dataLen);
+
+    /**
+     * 开启接收UDP数据的线程
+     * @return
+     */
+    int startRecvUdpData();
+
+    /**
+     * 停止接收UDP数据的线程
+     * @return
+     */
+    int stopRecvUdpData();
+
 private:
     int m_fd;
     struct sockaddr m_oppositeNet;
     std::string m_localIp;
     std::string m_localPort;
 
-    std::thread m_recv;
+    std::unique_ptr<std::thread> m_thraed;
+    ThreadStatus m_threadStatu;
 
     static P2PPeer* m_instance;
 };

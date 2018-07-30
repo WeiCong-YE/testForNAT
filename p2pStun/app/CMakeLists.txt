@@ -20,6 +20,8 @@ add_library( # Sets the name of the library.
              src/main/cpp/native-lib.cpp
              src/main/cpp/P2PPeer.cpp
 
+             src/main/cpp/cppToJava/CppCallJava.cpp
+
              #src/main/cpp/random/random.c
              src/main/cpp/stun/debug.c
              src/main/cpp/stun/rand.c
@@ -40,6 +42,7 @@ add_library( # Sets the name of the library.
 include_directories(src/main/cpp/stun/tools)
 include_directories(src/main/cpp/stun)
 include_directories(src/main/cpp/stun/usages)
+include_directories(src/main/cpp/cppToJava)
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by

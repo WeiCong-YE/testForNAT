@@ -376,7 +376,7 @@ stun_trans_sendto (StunTransport *tr, const uint8_t *buf, size_t len,
   {
     if (dstlen > 0)
     {
-			stun_debug("sendto mesage, len:%d, flags:%d", len, flags);
+			stun_debug("sendto mesage, len:%lu, flags:%d", len, flags);
 			val = sendto (tr->fd, (void *)buf, len, flags, dst, dstlen);
     }
 		else

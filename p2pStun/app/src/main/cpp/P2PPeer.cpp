@@ -4,12 +4,16 @@
 
 #include <unistd.h>
 #include <netdb.h>
+#include <poll.h>
+
+#include "bind.h"
 #include "appLog.h"
 #include "P2PPeer.h"
-#include "bind.h"
+#include "CppCallJava.h"
 
 P2PPeer* P2PPeer::m_instance = nullptr;
-P2PPeer::P2PPeer():m_fd(-1), m_oppositeNet{0}
+P2PPeer::P2PPeer():m_fd(-1), m_oppositeNet{0},
+                   m_threadStatu(ThreadStatus::NOT_SART)
 {}
 
 P2PPeer::~P2PPeer()
@@ -18,6 +22,8 @@ P2PPeer::~P2PPeer()
     {
         close(m_fd);
     }
+
+    stopRecvUdpData();
 }
 
 int P2PPeer::convertLocalNet(const struct sockaddr *addr, socklen_t addrlen)
@@ -36,7 +42,7 @@ int P2PPeer::convertLocalNet(const struct sockaddr *addr, socklen_t addrlen)
     {
         m_localIp.assign(hostbuf);
         m_localPort.assign(servbuf);
-        LOGD ("%s port %s", hostbuf, servbuf);
+        LOGD ("%s port %s, m_localIp:%s, m_localPort:%s", hostbuf, servbuf, m_localIp.c_str(), m_localPort.c_str());
         return 0;
     }
 }
@@ -70,6 +76,14 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
 
     for (ptr = res; ptr != NULL; ptr = ptr->ai_next)
     {
+        {
+            char hostbuf[NI_MAXHOST], servbuf[NI_MAXSERV];
+            int val = getnameinfo(ptr->ai_addr, sizeof(sockaddr), hostbuf, sizeof(hostbuf),
+                                  servbuf, sizeof(servbuf),
+                                  NI_NUMERICHOST | NI_NUMERICSERV);
+            LOGW("服务器IP：%s, 服务器端口：%s", hostbuf, servbuf);
+        }
+
         union {
             struct sockaddr_storage storage;
             struct sockaddr addr;
@@ -84,11 +98,17 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         else
         {
             convertLocalNet(&addr.addr, addrlen);
+//            localIp += m_localIp + "  ";
+//            localPort += m_localPort + "  ";
+
+            localIp = m_localIp;
+            localPort = m_localPort;
             ret = 0;
         }
     }
 
     freeaddrinfo (res);
+//    startRecvUdpData();
     return ret;
 }
 
@@ -111,6 +131,8 @@ int P2PPeer::setOppositeNet(const char* ip, const char* port)
 
     m_oppositeNet = *res->ai_addr;
     freeaddrinfo (res);
+
+    startRecvUdpData();//设置好了对端地址就开启线程准备接收对端发送过来的数据
     return ret;
 }
 
@@ -119,8 +141,89 @@ int P2PPeer::sendDataToOpposite(std::string data)
     if (m_fd < 0)
     {
         LOGE("未打开socket");
+        return -1;
     }
+    LOGE("send data:%s", data.c_str());
     return sendto (m_fd, (void *)data.c_str(), data.length(),
                    MSG_DONTWAIT | MSG_NOSIGNAL,
                    &m_oppositeNet, sizeof(m_oppositeNet));
+}
+
+#define RECV_BUFF_LEN_MXX 1300 //接收缓冲大小，考虑网络上MTU，这里最好548字节以内
+int P2PPeer::recvUdpDataLoop()
+{
+    char* recvBuf = new char[RECV_BUFF_LEN_MXX];
+    int delayTime = 2000;//milliseconds
+    struct sockaddr srcAddr = {0};
+    socklen_t srcAddrLen = 0;
+    pollfd ufd = {0};
+
+    ufd.fd = m_fd;
+    ufd.events |= POLLIN;
+
+    LOGD("接收数据的线程开始...");
+    m_threadStatu = ThreadStatus::RUNNING;
+    while(m_threadStatu == ThreadStatus::RUNNING)
+    {
+        int pollRet = poll (&ufd, 1, delayTime);
+        if (pollRet == 0)//超时
+        {
+            continue;
+        }
+        else if (pollRet > 0)//有数据可读
+        {
+            int recv = recvfrom (m_fd, (void *)recvBuf, RECV_BUFF_LEN_MXX,
+                                 MSG_DONTWAIT | MSG_NOSIGNAL, &srcAddr,
+                                 &srcAddrLen);
+            if (recv > 0)
+            {
+                proccesRecvedData(recvBuf, recv);
+            }
+            else//出错了
+            {
+                LOGE("recvfrom 返回了 0");
+                break;
+            }
+        }
+        else//出错了
+        {
+            LOGE("poll（） 返回了负值:%d", pollRet);
+            break;
+        }
+    }
+    
+    delete[] recvBuf;
+    m_threadStatu = ThreadStatus::EXIT;
+    LOGD("接收数据的线程结束。。。。。。。。。。。。");
+}
+
+//处理接收到的数据
+int P2PPeer::proccesRecvedData(const char* data, int dataLen)
+{
+    CppCallJava::Instance()->recvData(data, dataLen);
+    return 0;
+}
+
+int P2PPeer::startRecvUdpData()
+{
+    stopRecvUdpData();//先停止掉原线程
+    m_thraed.reset(new std::thread([this](){
+        this->recvUdpDataLoop();
+    }));
+
+    return 0;
+}
+
+int P2PPeer::stopRecvUdpData()
+{
+    LOGD("停止接收数据的线程");
+    if (m_threadStatu == ThreadStatus::RUNNING && m_thraed)
+    {
+        m_threadStatu = ThreadStatus ::EXIT;
+        m_thraed->join();
+        m_thraed.release();
+    }
+
+    m_threadStatu = ThreadStatus ::EXIT;
+    return 0;
 }
