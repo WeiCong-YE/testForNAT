@@ -1,5 +1,6 @@
 package com.p2p.p2pstun;
 
+import android.os.Handler;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -69,42 +70,64 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    boolean mbSetOppositeNet = false;
     /**
      * 发送数据到对端， 点击前需要先设置对端IP和端口号
      * @param view
      */
     public void sendData(View view){
+        if (mbSetOppositeNet) {
+            EditText sendTV = findViewById(R.id.sendText);
+            String sendData = sendTV.getText().toString();
+            if (sendData.length() > 0) {
+                int ret = sendData(sendData);
+                if (ret != sendData.length()) {
+                    Toast.makeText(this,
+                            "要发送长度=" + sendData.length() + ", 实际发送长度=" + ret,
+                            Toast.LENGTH_SHORT);
+                }
+            } else {
+                Toast.makeText(this, "请输入要发送的数据", Toast.LENGTH_SHORT);
+            }
+        }
+    }
+
+    public void setOppositeNet(View view){
         EditText oppositeIpTV = findViewById(R.id.oppositeIp);
         EditText oppositePortTV = findViewById(R.id.oppositePort);
         String oppositeIp = oppositeIpTV.getText().toString();
         String oppositePort = oppositePortTV.getText().toString();
 
         if (oppositeIp.length() > 0 &&
-            oppositePort.length() > 0){
+                oppositePort.length() > 0){
             if (0 == setOppositeNet(oppositeIp, oppositePort)){
-                EditText sendTV = findViewById(R.id.sendText);
-                String sendData = sendTV.getText().toString();
-                if (sendData.length() > 0){
-                    int ret = sendData(sendData);
-                    if (ret != sendData.length()){
-                        Toast.makeText(this,
-                                "要发送长度=" + sendData.length() + ", 实际发送长度=" + ret,
-                                Toast.LENGTH_SHORT);
-                    }
-                } else {
-                    Toast.makeText(this, "请输入要发送的数据", Toast.LENGTH_SHORT);
-                }
+                mbSetOppositeNet = true;
             } else {
                 Toast.makeText(this, "对端IP或端口错误！", Toast.LENGTH_LONG);
             }
         }
     }
 
+    String mRecvData;
+    Handler handler = new Handler();
+    Runnable update_thread = new Runnable()
+    {
+        public void run()
+        {
+            EditText recvTV = findViewById(R.id.recevText);
+            recvTV.setText(mRecvData);
+        }
+    };
+
     public void recvData(String data){
 //        EditText recvTV = findViewById(R.id.recevText);
 //        recvTV.setText(data);
-        Log.d("MainActivity", "recvData: " + data);
+        mRecvData = data;
+        Log.w("MainActivity", "recvData: " + mRecvData);
+        handler.post(update_thread);
     }
+
+
 
     /**
      * 初始化一些JVM环境

@@ -593,9 +593,41 @@ done:
   return bind_ret;
 }
 
+int MG_stun_usage_bind_socket_create(const struct sockaddr *srv,
+                                            socklen_t srvlen)
+{
+	StunTransport trans;
+	StunUsageTransReturn ret;
+	
+	ret = stun_trans_create (&trans, SOCK_DGRAM, 0, srv, srvlen);
+	if (ret != STUN_USAGE_TRANS_RETURN_SUCCESS) {
+		stun_debug ("STUN transaction failed: couldn't create transport.");
+		return -1;
+	}
+
+	struct sockaddr_in localaddr;
+	memset(&localaddr,0,sizeof(localaddr));
+
+	localaddr.sin_addr.s_addr		=	htonl(INADDR_ANY);
+	localaddr.sin_family			=	AF_INET;
+
+	for (unsigned short i=10000; i<10100; i++)
+	{
+		localaddr.sin_port = htons(i);
+		if(bind(trans.fd,(struct sockaddr*)&localaddr,sizeof(struct sockaddr_in)) == 0)
+        {
+    	    LOGW("bind port:%u", i);
+			break;
+		}
+	}
+
+	return trans.fd;
+}
+
 /** Blocking mode STUN binding discovery */
 StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
-                                            socklen_t srvlen, struct sockaddr_storage *addr,
+                                            socklen_t srvlen,
+                                            struct sockaddr_storage *addr,
                                             socklen_t *addrlen, int* fd)
 {
   StunTimer timer;
@@ -613,27 +645,18 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
   StunUsageBindReturn bind_ret;
   StunTransport trans;
 
-  //释放原fd
-  if (trans.fd != -1)
-    stun_trans_deinit (&trans);
   //初始化agent
   stun_agent_init (&agent, STUN_ALL_KNOWN_ATTRIBUTES,
                    STUN_COMPATIBILITY_RFC3489, 0);
 
   len = stun_usage_bind_create (&agent, &req, req_buf, sizeof(req_buf));
 
-  ret = stun_trans_create (&trans, SOCK_DGRAM, 0, srv, srvlen);
-  if (ret != STUN_USAGE_TRANS_RETURN_SUCCESS) {
-    stun_debug ("STUN transaction failed: couldn't create transport.");
-    bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-    goto done;
-  }
+  ret = stun_trans_init (&trans, *fd, srv, srvlen);
 
   val = stun_trans_send (&trans, req_buf, len);
   if (val < -1) {
     stun_debug ("STUN transaction failed: couldn't send request.");
-    bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-    goto done;
+    return STUN_USAGE_BIND_RETURN_ERROR;
   }
 
   stun_timer_start (&timer, STUN_TIMER_DEFAULT_TIMEOUT,
@@ -650,16 +673,14 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
         switch (stun_timer_refresh (&timer)) {
           case STUN_USAGE_TIMER_RETURN_TIMEOUT:
             stun_debug ("STUN transaction failed: time out.");
-                bind_ret = STUN_USAGE_BIND_RETURN_TIMEOUT; // fatal error!
-                goto done;
+                return STUN_USAGE_BIND_RETURN_TIMEOUT; // fatal error!
           case STUN_USAGE_TIMER_RETURN_RETRANSMIT:
             stun_debug ("STUN transaction retransmitted (timeout %dms).",
                         stun_timer_remainder (&timer));
                 val = stun_trans_send (&trans, req_buf, len);
                 if (val <  -1) {
                   stun_debug ("STUN transaction failed: couldn't resend request.");
-                  bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-                  goto done;
+                  return STUN_USAGE_BIND_RETURN_ERROR;
                 }
                 continue;
           case STUN_USAGE_TIMER_RETURN_SUCCESS:
@@ -677,8 +698,7 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
     valid = stun_agent_validate (&agent, &msg, buf, val, NULL, NULL);
     if (valid == STUN_VALIDATION_UNKNOWN_ATTRIBUTE)
     {
-      bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-      goto done;
+      return STUN_USAGE_BIND_RETURN_ERROR;
     }
 
     if (valid != STUN_VALIDATION_SUCCESS) {
@@ -691,19 +711,19 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
 
         assert (alternate_server.ss_family != AF_UNSPEC);
 
-        ret = stun_trans_create (&trans, SOCK_DGRAM, 0,
-                                 (struct sockaddr *) &alternate_server, alternate_server_len);
+        *fd = MG_stun_usage_bind_socket_create((struct sockaddr *) &alternate_server, alternate_server_len);
 
-        if (ret != STUN_USAGE_TRANS_RETURN_SUCCESS) {
-          bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-          goto done;
+        if (*fd < 0) {
+          return bind_ret;
         }
 
+				stun_trans_init (&trans, *fd, (struct sockaddr *) &alternate_server, alternate_server_len);
         val = stun_trans_send (&trans, req_buf, len);
         if (val < -1)
         {
-          bind_ret = STUN_USAGE_BIND_RETURN_ERROR;
-          goto done;
+            close(*fd);//重新创建socket
+            *fd = -1;
+            return STUN_USAGE_BIND_RETURN_ERROR;
         }
 
         stun_timer_start (&timer, STUN_TIMER_DEFAULT_TIMEOUT,
@@ -712,19 +732,10 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
       } else if (bind_ret ==  STUN_USAGE_BIND_RETURN_INVALID) {
         ret = STUN_USAGE_TRANS_RETURN_RETRY;
       } else {
-        break;
+        return bind_ret;
       }
     }
   }
   while (ret == STUN_USAGE_TRANS_RETURN_RETRY);
-
-    done:
-  if (trans.fd != -1 && bind_ret != STUN_USAGE_TRANS_RETURN_SUCCESS)
-  {
-      LOGW("deinit transport");
-      stun_trans_deinit (&trans);
-  }
-  *fd = trans.fd;
-
-  return bind_ret;
+    return bind_ret;
 }

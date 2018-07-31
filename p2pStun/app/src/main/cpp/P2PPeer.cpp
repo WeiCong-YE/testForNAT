@@ -74,6 +74,7 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         return ret;
     }
 
+    m_fd = MG_stun_usage_bind_socket_create(res->ai_addr, res->ai_addrlen);
     for (ptr = res; ptr != NULL; ptr = ptr->ai_next)
     {
         {
@@ -91,7 +92,9 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         socklen_t addrlen = sizeof (addr);
         StunUsageBindReturn val;
 
-        val = MG_stun_usage_bind_run (ptr->ai_addr, ptr->ai_addrlen, &addr.storage,
+        val = MG_stun_usage_bind_run (ptr->ai_addr, 
+                                      ptr->ai_addrlen,
+                                      &addr.storage,
                                       &addrlen, &m_fd);
         if (val)
             LOGE ("stun_usage_bind_run ret:%d", val);
@@ -157,9 +160,9 @@ int P2PPeer::recvUdpDataLoop()
     struct sockaddr srcAddr = {0};
     socklen_t srcAddrLen = 0;
     pollfd ufd = {0};
-
     ufd.fd = m_fd;
     ufd.events |= POLLIN;
+    memset(recvBuf, 0x0, RECV_BUFF_LEN_MXX);
 
     LOGD("接收数据的线程开始...");
     m_threadStatu = ThreadStatus::RUNNING;
@@ -184,6 +187,7 @@ int P2PPeer::recvUdpDataLoop()
                 LOGE("recvfrom 返回了 0");
                 break;
             }
+            memset(recvBuf, 0x0, RECV_BUFF_LEN_MXX);
         }
         else//出错了
         {
@@ -195,11 +199,13 @@ int P2PPeer::recvUdpDataLoop()
     delete[] recvBuf;
     m_threadStatu = ThreadStatus::EXIT;
     LOGD("接收数据的线程结束。。。。。。。。。。。。");
+    return 0;
 }
 
 //处理接收到的数据
 int P2PPeer::proccesRecvedData(const char* data, int dataLen)
 {
+    LOGW("接收到数据：%s", data);
     CppCallJava::Instance()->recvData(data, dataLen);
     return 0;
 }
@@ -220,8 +226,9 @@ int P2PPeer::stopRecvUdpData()
     if (m_threadStatu == ThreadStatus::RUNNING && m_thraed)
     {
         m_threadStatu = ThreadStatus ::EXIT;
+        LOGD("开始等待接收数据线程退出...");
         m_thraed->join();
-        m_thraed.release();
+//        std::this_thread::sleep_for (std::chrono::seconds(2));
     }
 
     m_threadStatu = ThreadStatus ::EXIT;

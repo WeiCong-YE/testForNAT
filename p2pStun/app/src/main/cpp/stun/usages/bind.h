@@ -158,6 +158,13 @@ size_t stun_usage_bind_keepalive (StunAgent *agent, StunMessage *msg,
 StunUsageBindReturn stun_usage_bind_run (const struct sockaddr *srv,
     socklen_t srvlen, struct sockaddr_storage *addr, socklen_t *addrlen);
 
+
+
+
+
+int MG_stun_usage_bind_socket_create(const struct sockaddr *srv,
+																						socklen_t srvlen);
+
 /**
  * 修改过的stun_usage_bind_run接口
  * @param srv
@@ -167,7 +174,9 @@ StunUsageBindReturn stun_usage_bind_run (const struct sockaddr *srv,
  * @return
  */
 StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
-    socklen_t srvlen, struct sockaddr_storage *addr, socklen_t *addrlen, int* fd);
+                                            socklen_t srvlen,
+                                            struct sockaddr_storage *addr, 
+                                            socklen_t *addrlen, int* fd);
 
 # ifdef __cplusplus
 }
