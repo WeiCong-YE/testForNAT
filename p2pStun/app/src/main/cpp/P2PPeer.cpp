@@ -42,7 +42,6 @@ int P2PPeer::convertLocalNet(const struct sockaddr *addr, socklen_t addrlen)
     {
         m_localIp.assign(hostbuf);
         m_localPort.assign(servbuf);
-        LOGD ("%s port %s, m_localIp:%s, m_localPort:%s", hostbuf, servbuf, m_localIp.c_str(), m_localPort.c_str());
         return 0;
     }
 }
@@ -50,12 +49,7 @@ int P2PPeer::convertLocalNet(const struct sockaddr *addr, socklen_t addrlen)
 int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
                                        std::string& localIp, std::string& localPort)
 {
-    if (m_fd > 0)
-    {
-        close(m_fd);
-        m_fd = -1;
-    }
-
+    stopRecvUdpData();
     struct addrinfo hints, *res;
     const struct addrinfo *ptr;
     int ret = -1;
@@ -66,7 +60,6 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
     hints.ai_flags = 0;
     if (port == NULL)
         port = "3478";
-    LOGW("STUN 服务器ip:%s, 端口:%s", serverIp, port);
     ret = getaddrinfo (serverIp, port, &hints, &res);
     if (ret)
     {
@@ -74,16 +67,20 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         return ret;
     }
 
-    m_fd = MG_stun_usage_bind_socket_create(res->ai_addr, res->ai_addrlen);
+    if (m_fd < 0)
+    {
+    	m_fd = MG_stun_usage_bind_socket_create(res->ai_addr, res->ai_addrlen);
+    }
+
+    m_localIp.clear();
+    m_localPort.clear();
     for (ptr = res; ptr != NULL; ptr = ptr->ai_next)
     {
-        {
-            char hostbuf[NI_MAXHOST], servbuf[NI_MAXSERV];
-            int val = getnameinfo(ptr->ai_addr, sizeof(sockaddr), hostbuf, sizeof(hostbuf),
-                                  servbuf, sizeof(servbuf),
-                                  NI_NUMERICHOST | NI_NUMERICSERV);
-            LOGW("服务器IP：%s, 服务器端口：%s", hostbuf, servbuf);
-        }
+        char hostbuf[NI_MAXHOST], servbuf[NI_MAXSERV];
+        getnameinfo(ptr->ai_addr, sizeof(sockaddr), 
+					hostbuf, sizeof(hostbuf),
+                    servbuf, sizeof(servbuf),
+                    NI_NUMERICHOST | NI_NUMERICSERV);
 
         union {
             struct sockaddr_storage storage;
@@ -91,7 +88,6 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         } addr;
         socklen_t addrlen = sizeof (addr);
         StunUsageBindReturn val;
-
         val = MG_stun_usage_bind_run (ptr->ai_addr, 
                                       ptr->ai_addrlen,
                                       &addr.storage,
@@ -101,17 +97,15 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         else
         {
             convertLocalNet(&addr.addr, addrlen);
-//            localIp += m_localIp + "  ";
-//            localPort += m_localPort + "  ";
 
             localIp = m_localIp;
             localPort = m_localPort;
+            LOGD("本地IP与端口对(%s:%s), 服务器IP与端口对(%s:%s)",
+                 localIp.c_str(), localPort.c_str(), hostbuf, servbuf);
             ret = 0;
         }
     }
-
     freeaddrinfo (res);
-//    startRecvUdpData();
     return ret;
 }
 
@@ -123,7 +117,7 @@ int P2PPeer::setOppositeNet(const char* ip, const char* port)
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = 0;
 
-    LOGW("STUN 服务器ip:%s, 端口:%s", ip, port);
+    LOGW("p2p对端ip:%s, 端口:%s", ip, port);
     int ret = getaddrinfo (ip, port, &hints, &res);
     if (ret)
     {
@@ -180,6 +174,13 @@ int P2PPeer::recvUdpDataLoop()
                                  &srcAddrLen);
             if (recv > 0)
             {
+                {
+                    char hostbuf[NI_MAXHOST], servbuf[NI_MAXSERV];
+                    int val = getnameinfo(&srcAddr, sizeof(sockaddr), hostbuf, sizeof(hostbuf),
+                                          servbuf, sizeof(servbuf),
+                                          NI_NUMERICHOST | NI_NUMERICSERV);
+                    LOGW("接收到对端数据，对端IP：%s, 对端端口：%s, 数据：%s", hostbuf, servbuf, recvBuf);
+                }
                 proccesRecvedData(recvBuf, recv);
             }
             else//出错了
@@ -205,7 +206,6 @@ int P2PPeer::recvUdpDataLoop()
 //处理接收到的数据
 int P2PPeer::proccesRecvedData(const char* data, int dataLen)
 {
-    LOGW("接收到数据：%s", data);
     CppCallJava::Instance()->recvData(data, dataLen);
     return 0;
 }

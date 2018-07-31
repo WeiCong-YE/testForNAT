@@ -667,7 +667,7 @@ int stun_message_validate_buffer_length (const uint8_t *msg, size_t length,
 
 void stun_message_id (const StunMessage *msg, StunTransactionId id)
 {
-	stun_debug("STUN_MESSAGE_TRANS_ID_POS:%d, STUN_MESSAGE_TRANS_ID_LEN:%d\n", STUN_MESSAGE_TRANS_ID_POS, STUN_MESSAGE_TRANS_ID_LEN);
+//	stun_debug("STUN_MESSAGE_TRANS_ID_POS:%d, STUN_MESSAGE_TRANS_ID_LEN:%d\n", STUN_MESSAGE_TRANS_ID_POS, STUN_MESSAGE_TRANS_ID_LEN);
   memcpy (id, msg->buffer + STUN_MESSAGE_TRANS_ID_POS, STUN_MESSAGE_TRANS_ID_LEN);
 }
 

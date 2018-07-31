@@ -57,11 +57,9 @@
 #include <fcntl.h>
 #endif
 
-
 #ifdef HAVE_POLL
-# include <poll.h>
+#include <poll.h>
 #endif
-
 
 #include "bind.h"
 #include "stunagent.h"
@@ -376,7 +374,7 @@ stun_trans_sendto (StunTransport *tr, const uint8_t *buf, size_t len,
   {
     if (dstlen > 0)
     {
-			stun_debug("sendto mesage, len:%lu, flags:%d", len, flags);
+//			stun_debug("sendto mesage, len:%lu, flags:%d", len, flags);
 			val = sendto (tr->fd, (void *)buf, len, flags, dst, dstlen);
     }
 		else
@@ -661,8 +659,6 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
 
   stun_timer_start (&timer, STUN_TIMER_DEFAULT_TIMEOUT,
                     STUN_TIMER_DEFAULT_MAX_RETRANSMISSIONS);
-  stun_debug ("STUN transaction started (timeout %dms).",
-              stun_timer_remainder (&timer));
 
   do
   {
@@ -679,7 +675,7 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
                         stun_timer_remainder (&timer));
                 val = stun_trans_send (&trans, req_buf, len);
                 if (val <  -1) {
-                  stun_debug ("STUN transaction failed: couldn't resend request.");
+                    stun_error ("STUN transaction failed: couldn't resend request.");
                   return STUN_USAGE_BIND_RETURN_ERROR;
                 }
                 continue;
@@ -689,34 +685,32 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
             break;
         }
       }
+
       val = stun_trans_recv (&trans, buf, sizeof (buf));
       if (val >= 0) {
-        break;
+          break;
       }
     }
-
     valid = stun_agent_validate (&agent, &msg, buf, val, NULL, NULL);
     if (valid == STUN_VALIDATION_UNKNOWN_ATTRIBUTE)
     {
-      return STUN_USAGE_BIND_RETURN_ERROR;
+        stun_error("STUN_USAGE_BIND_RETURN_ERROR");
+        return STUN_USAGE_BIND_RETURN_ERROR;
     }
 
     if (valid != STUN_VALIDATION_SUCCESS) {
-      ret = STUN_USAGE_TRANS_RETURN_RETRY;
+        ret = STUN_USAGE_TRANS_RETURN_RETRY;
     } else {
-      bind_ret = stun_usage_bind_process (&msg, (struct sockaddr *)  addr,
+        bind_ret = stun_usage_bind_process (&msg, (struct sockaddr *)  addr,
                                           addrlen, (struct sockaddr *) &alternate_server, &alternate_server_len);
       if (bind_ret == STUN_USAGE_BIND_RETURN_ALTERNATE_SERVER) {
         stun_trans_deinit (&trans);
-
         assert (alternate_server.ss_family != AF_UNSPEC);
 
         *fd = MG_stun_usage_bind_socket_create((struct sockaddr *) &alternate_server, alternate_server_len);
-
         if (*fd < 0) {
           return bind_ret;
         }
-
 				stun_trans_init (&trans, *fd, (struct sockaddr *) &alternate_server, alternate_server_len);
         val = stun_trans_send (&trans, req_buf, len);
         if (val < -1)
@@ -725,14 +719,13 @@ StunUsageBindReturn MG_stun_usage_bind_run (const struct sockaddr *srv,
             *fd = -1;
             return STUN_USAGE_BIND_RETURN_ERROR;
         }
-
         stun_timer_start (&timer, STUN_TIMER_DEFAULT_TIMEOUT,
                           STUN_TIMER_DEFAULT_MAX_RETRANSMISSIONS);
         ret = STUN_USAGE_TRANS_RETURN_RETRY;
       } else if (bind_ret ==  STUN_USAGE_BIND_RETURN_INVALID) {
-        ret = STUN_USAGE_TRANS_RETURN_RETRY;
+				ret = STUN_USAGE_TRANS_RETURN_RETRY;
       } else {
-        return bind_ret;
+				return bind_ret;
       }
     }
   }
