@@ -57,12 +57,12 @@ public class MainActivity extends AppCompatActivity {
             EditText gettedLocalIpAndPort = findViewById(R.id.gettedLocalIpAndPort);
             gettedLocalIpAndPort.setText(gettedIpAndPort);
 
-            String[] ipAndPort =  gettedIpAndPort.split(":");
-            EditText oppositeIp = findViewById(R.id.oppositeIp);
-            oppositeIp.setText(ipAndPort[0]);
-
-            EditText oppositePort = findViewById(R.id.oppositePort);
-            oppositePort.setText(ipAndPort[1]);
+//            String[] ipAndPort =  gettedIpAndPort.split(":");
+//            EditText oppositeIp = findViewById(R.id.oppositeIp);
+//            oppositeIp.setText(ipAndPort[0]);
+//
+//            EditText oppositePort = findViewById(R.id.oppositePort);
+//            oppositePort.setText(ipAndPort[1]);
         } else {
             Toast.makeText(this,
                     "获取本地外网IP与端口对失败",

@@ -54,6 +54,10 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
     const struct addrinfo *ptr;
     int ret = -1;
 
+    m_localIp.clear();
+    m_localPort.clear();
+    LOGW("本地外网IP与端口对(%s:%s), 服务器IP与端口对(%s:%s)",
+         localIp.c_str(), localPort.c_str(), serverIp, port);
     memset (&hints, 0, sizeof (hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
@@ -72,8 +76,6 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
     	m_fd = MG_stun_usage_bind_socket_create(res->ai_addr, res->ai_addrlen);
     }
 
-    m_localIp.clear();
-    m_localPort.clear();
     for (ptr = res; ptr != NULL; ptr = ptr->ai_next)
     {
         char hostbuf[NI_MAXHOST], servbuf[NI_MAXSERV];
@@ -91,16 +93,21 @@ int P2PPeer::getLocatIpAndPort(const char* serverIp, const char* port,
         val = MG_stun_usage_bind_run (ptr->ai_addr, 
                                       ptr->ai_addrlen,
                                       &addr.storage,
-                                      &addrlen, &m_fd);
+                                      &addrlen,
+                                      &m_fd);
         if (val)
-            LOGE ("stun_usage_bind_run ret:%d", val);
+        {
+            LOGE ("stun_usage_bind_run ret:%d, 本地外网IP与端口对(%s:%s), 服务器IP与端口对(%s:%s)",
+                  val, localIp.c_str(), localPort.c_str(), hostbuf, servbuf);
+            ret = val;
+        }
         else
         {
             convertLocalNet(&addr.addr, addrlen);
 
             localIp = m_localIp;
             localPort = m_localPort;
-            LOGD("本地IP与端口对(%s:%s), 服务器IP与端口对(%s:%s)",
+            LOGD("本地外网IP与端口对(%s:%s), 服务器IP与端口对(%s:%s)",
                  localIp.c_str(), localPort.c_str(), hostbuf, servbuf);
             ret = 0;
         }

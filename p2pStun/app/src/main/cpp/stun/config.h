@@ -11,16 +11,16 @@
 #define HAVE_C_VARARRAYS 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
-#define HAVE_DLFCN_H 1
+#define HAVE_DLFCN_H 0
 
 /* Whether getifaddrs() is available on the system */
-#define HAVE_GETIFADDRS 1
+#define HAVE_GETIFADDRS 0
 
 /* Have the GUPnP IGD library */
 /* #undef HAVE_GUPNP */
 
 /* Define to 1 if you have the <ifaddrs.h> header file. */
-#define HAVE_IFADDRS_H 1
+#define HAVE_IFADDRS_H 0
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
@@ -74,7 +74,7 @@
 /* #undef IGNORED_IFACE_PREFIX */
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
-#define LT_OBJDIR ".libs/"
+//#define LT_OBJDIR ".libs/"
 
 /* Define to 1 if assertions should be disabled. */
 /* #undef NDEBUG */
@@ -83,10 +83,10 @@
 #define NICEAPI_EXPORT 
 
 /* Name of package */
-#define PACKAGE "libnice"
+//#define PACKAGE "libnice"
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT ""
+//#define PACKAGE_BUGREPORT ""
 
 /* Define to the full name of this package. */
 #define PACKAGE_NAME "libnice"
